@@ -9,8 +9,14 @@ import (
 )
 
 type ConsumeHandler interface {
+	// Handle is called when a message is received when polling SQS.
 	Handle(message *sqs.Message, deadline ExtendTimeout) error
-	Error(message *sqs.Message, ok bool, err error)
+	
+	// Error handles any errors returned from Handle(...). The param
+	// messageHandled is true if Handle(...) returned an error, false if
+	// the message was handled but an error was encountered performing 
+	// queue operations. (extending deadline, or delete)
+	Error(message *sqs.Message, messageHandled bool, err error)
 }
 
 type ExtendTimeout func(message *sqs.Message, timeout time.Duration) error
