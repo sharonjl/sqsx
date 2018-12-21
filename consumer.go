@@ -15,7 +15,7 @@ type ConsumeHandler interface {
 	// Error handles any errors returned from Handle(...). The param
 	// messageHandled is true if Handle(...) returned an error, false if
 	// the message was handled but an error was encountered performing 
-	// queue operations. (extending deadline, or delete)
+	// queue operations. (SQS DeleteMessage)
 	Error(message *sqs.Message, messageHandled bool, err error)
 }
 
