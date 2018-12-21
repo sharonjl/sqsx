@@ -2,13 +2,15 @@ package sqsx
 
 import (
 	"errors"
+	"sync"
+	"sync/atomic"
+	"testing"
+	"time"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/sqs"
 	"github.com/stretchr/testify/assert"
-	"sync/atomic"
-	"testing"
-	"time"
 )
 
 type mockHandler struct {
@@ -116,13 +118,18 @@ func TestConsumer_Start(t *testing.T) {
 			return &sqs.ReceiveMessageOutput{Messages: []*sqs.Message{}}, nil
 		}
 		consumeCount := 0
+		mu := new(sync.Mutex)
 		con, _ := NewConsumer("QUEUE_NAME", svc, &ConsumerConfig{PollTimeout: pollTimeout, Timeout: time.Minute * 3})
 		con.(*consumer).consumeFn = func(m *sqs.Message, handler ConsumeHandler) {
+			defer mu.Unlock()
+			mu.Lock()
 			consumeCount++
 		}
 		go con.Start(nil)
 		<-time.NewTimer(time.Second).C
+		mu.Lock()
 		assert.Equal(t, 1, consumeCount)
+		mu.Unlock()
 		con.Stop()
 	})
 
@@ -144,13 +151,18 @@ func TestConsumer_Start(t *testing.T) {
 			return &sqs.ReceiveMessageOutput{Messages: []*sqs.Message{}}, nil
 		}
 		consumeCount := 0
+		mu := new(sync.Mutex)
 		con, _ := NewConsumer("QUEUE_NAME", svc, &ConsumerConfig{PollTimeout: pollTimeout})
 		con.(*consumer).consumeFn = func(m *sqs.Message, handler ConsumeHandler) {
+			defer mu.Unlock()
+			mu.Lock()
 			consumeCount++
 		}
 		go con.Start(nil)
 		<-time.NewTimer(time.Second).C
+		mu.Lock()
 		assert.Equal(t, 3, consumeCount)
+		mu.Unlock()
 		con.Stop()
 	})
 
@@ -193,6 +205,7 @@ func TestConsumer_Start(t *testing.T) {
 			}
 		}
 		consumeCount := int32(0)
+		mu := new(sync.Mutex)
 		con, _ := NewConsumer("QUEUE_NAME", svc, &ConsumerConfig{MaxWorkers: 2, PollTimeout: pollTimeout})
 		con.(*consumer).consumeFn = func(m *sqs.Message, handler ConsumeHandler) {
 			switch aws.StringValue(m.MessageId) {
@@ -203,11 +216,15 @@ func TestConsumer_Start(t *testing.T) {
 			case "msg_3":
 				<-time.NewTimer(time.Second).C
 			}
+			mu.Lock()
 			atomic.AddInt32(&consumeCount, 1)
+			mu.Unlock()
 		}
 		go con.Start(nil)
 		<-time.NewTimer(time.Second * 4).C
+		mu.Lock()
 		assert.Equal(t, int32(3), consumeCount)
+		mu.Unlock()
 		con.Stop()
 	})
 
