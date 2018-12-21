@@ -20,8 +20,8 @@ type consumeJobHandler struct {
 	DeadlineTimeout time.Duration
 }
 
-func (j *consumeJobHandler) Error(message *sqs.Message, ok bool, err error) {
-	log.Error().Err(err).Bool("success", ok).
+func (j *consumeJobHandler) Error(message *sqs.Message, messageHandled bool, err error) {
+	log.Error().Err(err).Bool("messageHandled", messageHandled).
 		Str("messageID", aws.StringValue(message.MessageId)).
 		Interface("message", message).Msg("Error processing message")
 }
